@@ -1,45 +1,47 @@
+const userModel = require("../models/UserModel");
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const UserModel = require("../models/UserModel");
 
-const maxAge = 3 * 24 * 60 * 60;
-
-const createToken = (id) => {
-  return jwt.sign({ id }, "ws@secret_key/2001", { expiresIn: maxAge });
+const generateToken = (user) => {
+  const token = jwt.sign(
+    {
+      userId: user._id,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
+  return token;
 };
 
-const handleErrors = (err) => {
-  const errors = { email: "", password: "" };
-
-  if (err.code === 11000) {
-    errors.email = "Email is already registered";
-    return errors;
-  }
-
-  if (err.message.includes("User validation failed")) {
-    Object.values(err.errors).forEach((el) => {
-      errors[el.path] = el.message;
-    });
-  }
-
-  return errors;
-};
-
-module.exports.register = async (req, res, next) => {
+module.exports.register = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await UserModel.create({ email, password });
-    const token = createToken(user._id);
 
-    res.cookie("jwt", token, {
-      withCredentials: true,
-      httpOnly: false,
-      maxAge: maxAge * 1000,
-    });
-    res.status(201).json({ user: user._id, created: true });
+    if (!(email || password)) {
+      return res.status(400).json({
+        message: "Please enter email and password",
+      });
+    }
+
+    const cookie = req.cookies.jwt;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await new userModel({ email, password: hashedPassword });
+    const token = generateToken(user._id);
+
+    if (!cookie) {
+      res.cookie("jwt", token, {
+        httpOnly: true,
+        maxAge: 1000 * 60 * 60,
+      });
+    }
+
+    await user.save();
+    res.sendStatus(200);
   } catch (err) {
-    console.log(err);
-    const errors = handleErrors(err);
-    res.json({ errors, createad: false });
+    res.status(500).send({ error: err.message });
   }
 };
-module.exports.login = async (req, res, next) => {};
+
+module.exports.login = (req, res) => {
+  res.send("Login Post Request");
+};
