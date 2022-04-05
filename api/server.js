@@ -20,7 +20,7 @@ mongoose
 
 app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 app.use(express.json());
-app.use(cookieParser({ httpOnly: true, secure: true }));
+app.use(cookieParser({ httpOnly: true, secure: false }));
 app.use("/api", authRouter);
 
 app.listen(3001, () => {
